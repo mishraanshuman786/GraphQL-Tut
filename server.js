@@ -1,44 +1,28 @@
-import { ApolloServer, gql } from "apollo-server";
+import { ApolloServer } from "apollo-server";
 import { ApolloServerPluginLandingPageGraphQLPlayground } from "apollo-server-core";
-import { quotes, users } from "./fakedb.js";
-const typeDefs = gql`
-  type Query {
-    users: [User]
-    user(id: ID!): User
-    quotes: [Quote]
-    quote(id: ID!): Quote
-  }
+import resolvers from "./resolvers.js";
+import typeDefs from "./schemaGql.js";
+import { config } from "dotenv";
+import { dbconnect } from "./utils/dbconnect.js";
+import jwt from "jsonwebtoken";
 
-  type Quote {
-    name: String
-    by: String
-  }
+// configuring dotenv
+config();
+// connecting to mongodb database
+dbconnect(process.env.DB_URL);
 
-  type User {
-    id: ID
-    firstName: String
-    lastName: String
-    email: String
-    password: String
-    quotes: [Quote]
+// context middleware function
+const context = async ({ req }) => {
+  const { authorization } = req.headers;
+  if (authorization) {
+    const { userId } = await jwt.verify(authorization, process.env.JWT_SECRET);
+    return { userId };
   }
-`;
-
-const resolvers = {
-  Query: {
-    users: () => users,
-    user: (_, { id }) => users.find((user) => user.id == id),
-    quotes: () => quotes,
-    quote: (_, { id }) => quotes.find((quote) => quote.by == id),
-  },
-  User: {
-    quotes: (parent) => quotes.filter((quote) => quote.by === parent.id),
-  },
 };
-
 const server = new ApolloServer({
   typeDefs,
   resolvers,
+  context,
   plugins: [ApolloServerPluginLandingPageGraphQLPlayground()],
 });
 
